@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const secp = require("@noble/secp256k1");
-const { ethers } = require("ethers");
+const { send } = require('process');
 const port = 3042;
 
 // localhost can have cross origin errors
@@ -11,52 +11,53 @@ app.use(cors());
 app.use(express.json());
 
 
-/*--------------------------  THE FOLLOWING BLOCK WILL LOG A RANDOMLY GENERATED BALANCES OBJ TO THE CONSOLE      --------------------------------*/
+/*--------------------------  GENERATES RANDOM PRIVATE KEYS AND CREATES CHECKSUMED ADDRESSES  --------------------------------*/
 
-/*
+
 const SAMPLE_INITIAL_BALANCE = 100;
 const NUM_ADDRESSES = 3;
 
 
 
 function getSampleBalance() {
-  const addresses = getRandomAddresses();
+  const {addressArray, privateKeys} = getRandomAddresses();
 
-  const sampleBalance = {};
-  addresses.map(pubKey => sampleBalance[pubKey] = SAMPLE_INITIAL_BALANCE);
+  const accounts = {};
+  addressArray.map(pubKey => accounts[pubKey] = SAMPLE_INITIAL_BALANCE);
 
-  return sampleBalance;
+  return {privateKeys, accounts};
 }
 
 
 function getRandomAddresses() {
-  const publicKeyArray = [];
+  const addressArray = [];
+  const privateKeys = [];
+
   for(let i = 0; i < NUM_ADDRESSES; i++) {
-    publicKeyArray.push(getRandomAddress());
+    let {address, privateKey}  = getRandomAddress();
+    addressArray.push(address);
+    privateKeys.push(privateKey);
   }
-  return publicKeyArray;
+  return {addressArray, privateKeys};
 
 }
-
 
 function getRandomAddress() {
   const privateKey = secp.utils.randomPrivateKey();
   const publicKey = secp.getPublicKey(privateKey);
   const publicKeyHex = `0x${secp.utils.bytesToHex(publicKey).slice(0,40)}`;
-  const address = ethers.utils.getAddress(publicKeyHex);
-  return address;
+  const privateKeyHex = `0x${secp.utils.bytesToHex(privateKey)}`
+  return {address: publicKeyHex, privateKey: privateKeyHex};
 }
-
-console.log(getSampleBalance());
-*/
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------*/
+const {accounts, privateKeys} = getSampleBalance();
+const balances = accounts;
+console.log("\n\nAccounts:\n", balances);
+console.log("\n\nPrivate keys:\n", privateKeys);
 
-const balances = {
-  '0x040D9B84dA124C1Cf7E5a3056F9453B429c37849': 100,
-  '0x04081dCc6BBE0Ee7ebF396e3fEEb05c4153aEF45': 100,
-  '0x04012bC51ae7ba5890B8754B2F0d899984581FBd': 100
-}
+
+
 
 app.get('/balance/:address', (req, res) => {
   const {address} = req.params;
@@ -65,11 +66,41 @@ app.get('/balance/:address', (req, res) => {
 });
 
 app.post('/send', (req, res) => {
-  const {sender, recipient, amount} = req.body;
-  balances[sender] -= amount;
-  balances[recipient] = (balances[recipient] || 0) + +amount;
-  res.send({ balance: balances[sender] });
+  const {sender, recipient, amount, privKey} = req.body;
+  const privateKey = hexToBytes(privKey);
+  const publicKey =  `0x${secp.utils.bytesToHex(secp.getPublicKey(privateKey)).slice(0,40)}`;
+
+  console.log(publicKey, sender);
+
+
+
+
+  const isValid = publicKey === sender;
+  if(isValid) {
+    balances[sender] -= parseInt(amount);
+    balances[recipient] = (balances[recipient] || 0) + parseInt(amount);
+    res.send({ balance: balances[sender], error: "Success!" });
+  }
+  else {
+    res.send({balance: balances[sender], error:"Invalid transaction."})
+  }
+
+  
 });
+
+
+
+function hexToBytes(hexSeq) {
+  //WARNING: DOES NOT CHECK FOR ODD SIZED HEX SEQUENCE.
+  const seq = hexSeq.slice(2);
+  const bytes = new Uint8Array(32);
+  for(let i = 0; i < hexSeq.length - 2; i += 2) {
+      let hex = seq.slice(i, i + 2);
+      let byte = parseInt(seq.slice(i, i + 2), 16);
+      bytes[parseInt(i/2)] = byte;
+  }
+  return bytes;
+}
 
 
 

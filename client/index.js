@@ -19,16 +19,18 @@ document.getElementById("transfer-amount").addEventListener('click', () => {
   const sender = document.getElementById("exchange-address").value;
   const amount = document.getElementById("send-amount").value;
   const recipient = document.getElementById("recipient").value;
+  const privKey = document.getElementById("private-key").value;
 
   const body = JSON.stringify({
-    sender, amount, recipient
+    sender, amount, recipient, privKey
   });
 
   const request = new Request(`${server}/send`, { method: 'POST', body });
 
   fetch(request, { headers: { 'Content-Type': 'application/json' }}).then(response => {
     return response.json();
-  }).then(({ balance }) => {
+  }).then(({ balance, error }) => {
     document.getElementById("balance").innerHTML = balance;
+    document.getElementById("error").innerHTML = error;
   });
 });
